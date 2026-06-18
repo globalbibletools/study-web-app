@@ -1,11 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-
-	"github.com/starfederation/datastar-go/datastar"
 
 	. "maragu.dev/gomponents"
 	ds "maragu.dev/gomponents-datastar"
@@ -18,31 +17,14 @@ type Signals struct {
 }
 
 func main() {
-	http.HandleFunc("/endpoint", func(w http.ResponseWriter, r *http.Request) {
-		sse := datastar.NewSSE(w, r)
-
-		signals := &Signals{}
-		if err := datastar.ReadSignals(r, signals); err != nil {
-			log.Printf("Error: %v\n", err)
-			return
-		}
-
-		log.Printf("Reading chapter: %s\n", signals.Chapter)
-
-		chapter, err := strconv.ParseUint(signals.Chapter, 10, 32)
+	http.HandleFunc("/chapter/{chapterNumber}", func(w http.ResponseWriter, r *http.Request) {
+		chapter, err := strconv.ParseUint(r.PathValue("chapterNumber"), 10, 32)
 		if err != nil {
 			log.Printf("Error: %v\n", err)
 			return
 		}
 
-		chapter += 1
-		signals.Chapter = strconv.FormatUint(chapter, 10)
-
-		if err := sse.PatchElementGostar(pageContent(signals.Chapter)); err != nil {
-			log.Printf("Error: %v\n", err)
-			return
-		}
-		if err := sse.MarshalAndPatchSignals(signals); err != nil {
+		if err := read(uint(chapter)).Render(w); err != nil {
 			log.Printf("Error: %v\n", err)
 			return
 		}
@@ -73,7 +55,11 @@ func read(page uint) Node {
 			}),
 			chapterInput(),
 			Button(
-				ds.On("click", "@get('/endpoint')"),
+				ds.On("click", fmt.Sprintf("@get('/chapter/%d')", page-1)),
+				Text("Prev Chapter"),
+			),
+			Button(
+				ds.On("click", fmt.Sprintf("@get('/chapter/%d')", page+1)),
 				Text("Next Chapter"),
 			),
 		),
