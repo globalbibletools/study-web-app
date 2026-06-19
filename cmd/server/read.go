@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"crawshaw.io/sqlite/sqlitex"
 	. "maragu.dev/gomponents"
 	ds "maragu.dev/gomponents-datastar"
 	. "maragu.dev/gomponents/components"
@@ -17,6 +18,12 @@ type Signals struct {
 }
 
 func main() {
+	dbpool, err := sqlitex.Open("file:memory:?mode=memory", 0, 10)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_ = dbpool
+
 	http.HandleFunc("/chapter/{chapterNumber}", func(w http.ResponseWriter, r *http.Request) {
 		chapter, err := strconv.ParseUint(r.PathValue("chapterNumber"), 10, 32)
 		if err != nil {

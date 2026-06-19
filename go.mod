@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	crawshaw.io/sqlite v0.3.2 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/CAFxX/httpcompression v0.0.9 // indirect
 	github.com/air-verse/air v1.65.3 // indirect
