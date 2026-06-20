@@ -1,0 +1,36 @@
+@layer reset, system, components, pages;
+
+@import "./reset.css" layer(reset);
+@import "./system.css" layer(system);
+@import "./components.css" layer(components);
+
+@layer pages {
+    .reading-content {
+        font-family: var(--font-mixed);
+        line-height: var(--line-loose);
+    }
+
+    .verse-number {
+        font-size: var(--text-xs);
+    }
+
+    .chapter-input {
+        display: inline-block;
+        position: relative;
+
+        input {
+            padding-right: var(--space-6);
+        }
+    }
+
+    .chapter-input-actions {
+        position: absolute;
+        height: 100%;
+        right: 0;
+        top: 0;
+        display: flex;
+        gap: var(--space-2);
+        align-items: middle;
+        padding: 0 var(--space-2);
+    }
+}

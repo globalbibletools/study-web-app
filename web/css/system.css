@@ -1,0 +1,96 @@
+:root {
+  /* Brand */
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+
+  /* Neutrals */
+  --color-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-border: #9da2ab;
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+
+  /* States */
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+
+  --font-noto-sans: "Noto Sans";
+  --font-sbl-hebrew: "SBL Hebrew";
+  --font-sbl-greek: "SBL Greek";
+
+  --font-sans: var(--font-noto-sans), ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-hebrew: var(--font-sbl-hebrew), var(--font-sans);
+  --font-greek: var(--font-sbl-greek), var(--font-sans);
+  --font-mixed: var(--font-sbl-greek), var(--font-sbl-hebrew), var(--font-sans);
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-bold: 700;
+
+  --line-tight: 1.2;
+  --line-normal: 1.5;
+  --line-loose: 2;
+
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-12: 3rem;    /* 48px */
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+
+  --border-width: 1px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.15);
+
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+}
+
+@font-face {
+  font-family: "Noto Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/noto-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "SBL Hebrew";
+  src: url("/static/fonts/SBL_Hbrw.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0590-05FF;
+  size-adjust: 140%;
+}
+
+@font-face {
+  font-family: "SBL Greek";
+  src: url("../assets/fonts/SBL_grk.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+  size-adjust: 112%;
+}
