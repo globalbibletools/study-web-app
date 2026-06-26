@@ -122,9 +122,9 @@ func getChapterData(context context.Context, chapter uint) (ChapterData, error) 
 					verseNumber,
 					words,
 				})
+				words = []WordData{}
 			}
 			verseNumber = newVerseNumber
-			verses = []VerseData{}
 		}
 
 		words = append(words, WordData{
