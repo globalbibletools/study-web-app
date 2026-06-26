@@ -199,13 +199,21 @@ func chapterInput(data ChapterData) Node {
 		),
 		Div(
 			Class("chapter-input-actions"),
-			Button(
-				ds.On("click", fmt.Sprintf("@get('/chapter/%d')", data.Chapter-1)),
-				Text("P"),
+			button(
+				ButtonProps{
+					OnClick: fmt.Sprintf("@get('/chapter/%d')", data.Chapter-1),
+				},
+				icon(IconProps{
+					Icon: "arrow-up",
+				}),
 			),
-			Button(
-				ds.On("click", fmt.Sprintf("@get('/chapter/%d')", data.Chapter+1)),
-				Text("N"),
+			button(
+				ButtonProps{
+					OnClick: fmt.Sprintf("@get('/chapter/%d')", data.Chapter+1),
+				},
+				icon(IconProps{
+					Icon: "arrow-down",
+				}),
 			),
 		),
 	)
@@ -250,4 +258,50 @@ func layout(
 		},
 		Body: children,
 	})
+}
+
+type IconProps struct {
+	Class      string
+	Icon       string
+	FixedWidth bool
+	Size       string
+}
+
+var iconSizeMap = map[string]float64{
+	"xs":  0.75,
+	"sm":  0.875,
+	"md":  1,
+	"lg":  1.25,
+	"xl":  1.5,
+	"2xl": 2,
+}
+
+func icon(props IconProps) Node {
+	size, exists := iconSizeMap[props.Size]
+	if !exists {
+		size = iconSizeMap["md"]
+	}
+
+	heightStyle := "height: " + strconv.FormatFloat(size, 'f', 2, 64) + "em;"
+	widthStyle := "width: " + strconv.FormatFloat(size*1.25, 'f', 2, 64) + "em;"
+
+	return SVG(
+		Class("icon "+props.Class),
+		Aria("hidden", "true"),
+		Style(heightStyle+" "+widthStyle),
+		Rawf(`<use href="/static/img/icons.svg#%s" />`, props.Icon),
+	)
+}
+
+type ButtonProps struct {
+	Class   string
+	OnClick string
+}
+
+func button(props ButtonProps, children ...Node) Node {
+	return Button(
+		Class("btn "+props.Class),
+		If(len(props.OnClick) > 0, ds.On("click", props.OnClick)),
+		Group(children),
+	)
 }
