@@ -61,7 +61,12 @@ func main() {
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		chapterData, err := getChapterData(r.Context(), 1)
+		chapter, err := strconv.ParseUint(r.URL.Query().Get("chapter"), 10, 32)
+		if err != nil {
+			chapter = 1
+		}
+
+		chapterData, err := getChapterData(r.Context(), uint(chapter))
 		if err != nil {
 			log.Printf("Error: %v\n", err)
 			http.Error(w, "Server Error", http.StatusInternalServerError)
@@ -234,6 +239,11 @@ func read(data ChapterData) Node {
 		ds.Signals(map[string]any{
 			"chapter": pageStr,
 		}),
+		ds.Effect(`
+			const url = new URL(window.location);
+			$chapter ? url.searchParams.set('chapter', $chapter) : url.searchParams.delete('chapter');
+			window.history.replaceState({}, '', url);
+		`),
 		toolbar(data),
 		pageContent(data),
 	)
