@@ -1,9 +1,3 @@
-@layer reset, system, components, pages;
-
-@import "./reset.css" layer(reset);
-@import "./system.css" layer(system);
-@import "./components.css" layer(components);
-
 @layer pages {
     .reading-content {
         font-family: var(--font-mixed);

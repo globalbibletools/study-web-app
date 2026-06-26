@@ -56,7 +56,7 @@ func main() {
 		)
 
 		chapterStr := strconv.FormatUint(uint64(chapter), 10)
-		sse.MarshalAndPatchSignals(Signals{ Chapter: chapterStr, })
+		sse.MarshalAndPatchSignals(Signals{Chapter: chapterStr})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -239,7 +239,13 @@ func layout(
 		Title:    "Global Bible Tools",
 		Language: "en",
 		Head: []Node{
-			Script(Type("module"), Src("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.2/bundles/datastar.js")),
+			Script(Type("module"), Src("/static/scripts/datastar.js")),
+			Link(Rel("stylesheet"), Href("/static/css/reset.css")),
+			Link(Rel("stylesheet"), Href("/static/css/system.css")),
+			Link(Rel("stylesheet"), Href("/static/css/components.css")),
+			Link(Rel("preload"), Href("/static/fonts/SBL_Hbrw.woff2"), As("font"), Type("font/woff2"), CrossOrigin("")),
+			Link(Rel("preload"), Href("/static/fonts/SBL_grk.woff2"), As("font"), Type("font/woff2"), CrossOrigin("")),
+			Link(Rel("preload"), Href("/static/fonts/noto-sans-latin.woff2"), As("font"), Type("font/woff2"), CrossOrigin("")),
 			If(len(styles) > 0, Link(Rel("stylesheet"), Href(styles))),
 		},
 		Body: children,
