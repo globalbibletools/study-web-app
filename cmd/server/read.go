@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
 	"crawshaw.io/sqlite/sqlitex"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/starfederation/datastar-go/datastar"
 	. "maragu.dev/gomponents"
 	ds "maragu.dev/gomponents-datastar"
@@ -18,10 +20,59 @@ import (
 )
 
 type Signals struct {
-	Chapter string `json:"chapter"`
+	Reference string `json:"reference"`
 }
 
 var dbpool *sqlitex.Pool
+
+type Reference struct {
+	book    uint
+	chapter uint
+}
+
+var books = []string{
+	"Genesis",
+	"Exodus",
+	"Leviticus",
+}
+
+func parseReference(reference string) Reference {
+	chapterStartIndex := strings.IndexAny(reference, "0123456789")
+	if chapterStartIndex < 0 {
+		return Reference{
+			book:    1,
+			chapter: 1,
+		}
+	}
+
+	matches := fuzzy.RankFindNormalizedFold(reference[0:chapterStartIndex], books)
+	sort.Sort(matches)
+
+	if len(matches) == 0 {
+		return Reference{
+			book:    1,
+			chapter: 1,
+		}
+	}
+
+	book := matches[0].OriginalIndex + 1
+	chapter, err := strconv.ParseUint(reference[chapterStartIndex:], 10, 32)
+	if err != nil {
+		return Reference{
+			book:    1,
+			chapter: 1,
+		}
+	}
+
+	return Reference{
+		book:    uint(book),
+		chapter: uint(chapter),
+	}
+}
+
+func formatReference(reference Reference) string {
+	return books[reference.book - 1] + strconv.FormatUint(uint64(reference.chapter), 10)
+}
 
 func main() {
 	var err error
@@ -33,16 +84,11 @@ func main() {
 	fileServer := http.FileServer(http.Dir("./web"))
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer))
 
-	http.HandleFunc("/chapter/{chapterNumber}", func(w http.ResponseWriter, r *http.Request) {
-		chapter, err := strconv.ParseUint(r.PathValue("chapterNumber"), 10, 32)
-		if err != nil {
-			log.Printf("Error: %v\n", err)
-			return
-		}
+	http.HandleFunc("/reference/{reference}", func(w http.ResponseWriter, r *http.Request) {
+		reference := parseReference(r.PathValue("reference"))
 
-		chapterData, err := getChapterData(r.Context(), uint(chapter))
+		chapterData, err := getChapterData(r.Context(), reference)
 		if err != nil {
-			log.Printf("Error: %v\n", err)
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
@@ -56,19 +102,15 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		chapterStr := strconv.FormatUint(uint64(chapter), 10)
-		sse.MarshalAndPatchSignals(Signals{Chapter: chapterStr})
+		referenceStr := formatReference(reference)
+		sse.MarshalAndPatchSignals(Signals{Reference: referenceStr})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		chapter, err := strconv.ParseUint(r.URL.Query().Get("chapter"), 10, 32)
-		if err != nil {
-			chapter = 1
-		}
+		reference := parseReference(r.URL.Query().Get("reference"))
 
-		chapterData, err := getChapterData(r.Context(), uint(chapter))
+		chapterData, err := getChapterData(r.Context(), reference)
 		if err != nil {
-			log.Printf("Error: %v\n", err)
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
@@ -89,12 +131,12 @@ type VerseData struct {
 }
 
 type ChapterData struct {
-	BookName string
-	Chapter  uint
-	Verses   []VerseData
+	Reference Reference
+	BookName  string
+	Verses    []VerseData
 }
 
-func getChapterData(context context.Context, chapter uint) (ChapterData, error) {
+func getChapterData(context context.Context, reference Reference) (ChapterData, error) {
 	conn := dbpool.Get(context)
 	if conn == nil {
 		return ChapterData{}, fmt.Errorf("failed to get database connection")
@@ -108,8 +150,8 @@ func getChapterData(context context.Context, chapter uint) (ChapterData, error) 
 		and chapter = $chapter
 		order by verse.id, word.id
 	`)
-	stmt.SetInt64("$bookId", 1)
-	stmt.SetInt64("$chapter", int64(chapter))
+	stmt.SetInt64("$bookId", int64(reference.book))
+	stmt.SetInt64("$chapter", int64(reference.chapter))
 
 	var verses []VerseData
 	var verseNumber uint = 0
@@ -160,9 +202,9 @@ func getChapterData(context context.Context, chapter uint) (ChapterData, error) 
 	stmt.Step()
 
 	return ChapterData{
-		BookName: stmt.GetText("name"),
-		Chapter:  chapter,
-		Verses:   verses,
+		Reference: reference,
+		BookName:  stmt.GetText("name"),
+		Verses:    verses,
 	}, nil
 }
 
@@ -171,8 +213,8 @@ func pageContent(data ChapterData) Node {
 		ID("content"),
 		Div(
 			Class("reading-content"),
-			If(data.Chapter < 40, Dir("rtl")),
-			If(data.Chapter >= 40, Dir("ltr")),
+			If(data.Reference.book < 40, Dir("rtl")),
+			If(data.Reference.book >= 40, Dir("ltr")),
 			P(
 				Map(data.Verses, func(verse VerseData) Node {
 					verseNumberStr := strconv.FormatUint(uint64(verse.verseNumber), 10)
@@ -200,13 +242,16 @@ func chapterInput(data ChapterData) Node {
 		ID("chapter-input"),
 		Class("chapter-input"),
 		ui.TextInput(ui.TextInputProps{},
-			ds.Bind("chapter"),
+			ds.Bind("reference"),
 		),
 		Div(
 			Class("chapter-input-actions"),
 			ui.Btn(
 				ui.ButtonProps{
-					OnClick: fmt.Sprintf("@get('/chapter/%d')", data.Chapter-1),
+					OnClick: fmt.Sprintf(
+						"@get('/reference/%s')",
+						formatReference(Reference{book: data.Reference.book, chapter: data.Reference.chapter - 1}),
+					),
 				},
 				ui.Icon(ui.IconProps{
 					Icon: "arrow-up",
@@ -214,7 +259,10 @@ func chapterInput(data ChapterData) Node {
 			),
 			ui.Btn(
 				ui.ButtonProps{
-					OnClick: fmt.Sprintf("@get('/chapter/%d')", data.Chapter+1),
+					OnClick: fmt.Sprintf(
+						"@get('/reference/%s')",
+						formatReference(Reference{book: data.Reference.book, chapter: data.Reference.chapter + 1}),
+					),
 				},
 				ui.Icon(ui.IconProps{
 					Icon: "arrow-down",
@@ -232,16 +280,14 @@ func toolbar(data ChapterData) Node {
 }
 
 func read(data ChapterData) Node {
-	pageStr := strconv.FormatUint(uint64(data.Chapter), 10)
-
 	return ui.Layout(
 		"/static/css/read.css",
 		ds.Signals(map[string]any{
-			"chapter": pageStr,
+			"reference": formatReference(data.Reference),
 		}),
 		ds.Effect(`
 			const url = new URL(window.location);
-			$chapter ? url.searchParams.set('chapter', $chapter) : url.searchParams.delete('chapter');
+			$reference ? url.searchParams.set('reference', $reference) : url.searchParams.delete('reference');
 			window.history.replaceState({}, '', url);
 		`),
 		toolbar(data),
