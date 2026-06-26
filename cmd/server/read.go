@@ -12,8 +12,9 @@ import (
 	"github.com/starfederation/datastar-go/datastar"
 	. "maragu.dev/gomponents"
 	ds "maragu.dev/gomponents-datastar"
-	. "maragu.dev/gomponents/components"
 	. "maragu.dev/gomponents/html"
+
+	"gbtreader/internal/ui"
 )
 
 type Signals struct {
@@ -193,25 +194,24 @@ func chapterInput(data ChapterData) Node {
 	return Div(
 		ID("chapter-input"),
 		Class("chapter-input"),
-		Input(
-			Class("text-input"),
+		ui.TextInput(ui.TextInputProps{},
 			ds.Bind("chapter"),
 		),
 		Div(
 			Class("chapter-input-actions"),
-			button(
-				ButtonProps{
+			ui.Btn(
+				ui.ButtonProps{
 					OnClick: fmt.Sprintf("@get('/chapter/%d')", data.Chapter-1),
 				},
-				icon(IconProps{
+				ui.Icon(ui.IconProps{
 					Icon: "arrow-up",
 				}),
 			),
-			button(
-				ButtonProps{
+			ui.Btn(
+				ui.ButtonProps{
 					OnClick: fmt.Sprintf("@get('/chapter/%d')", data.Chapter+1),
 				},
-				icon(IconProps{
+				ui.Icon(ui.IconProps{
 					Icon: "arrow-down",
 				}),
 			),
@@ -229,79 +229,12 @@ func toolbar(data ChapterData) Node {
 func read(data ChapterData) Node {
 	pageStr := strconv.FormatUint(uint64(data.Chapter), 10)
 
-	return layout(
+	return ui.Layout(
 		"/static/css/read.css",
 		ds.Signals(map[string]any{
 			"chapter": pageStr,
 		}),
 		toolbar(data),
 		pageContent(data),
-	)
-}
-
-func layout(
-	styles string,
-	children ...Node,
-) Node {
-	return HTML5(HTML5Props{
-		Title:    "Global Bible Tools",
-		Language: "en",
-		Head: []Node{
-			Script(Type("module"), Src("/static/scripts/datastar.js")),
-			Link(Rel("stylesheet"), Href("/static/css/reset.css")),
-			Link(Rel("stylesheet"), Href("/static/css/system.css")),
-			Link(Rel("stylesheet"), Href("/static/css/components.css")),
-			Link(Rel("preload"), Href("/static/fonts/SBL_Hbrw.woff2"), As("font"), Type("font/woff2"), CrossOrigin("")),
-			Link(Rel("preload"), Href("/static/fonts/SBL_grk.woff2"), As("font"), Type("font/woff2"), CrossOrigin("")),
-			Link(Rel("preload"), Href("/static/fonts/noto-sans-latin.woff2"), As("font"), Type("font/woff2"), CrossOrigin("")),
-			If(len(styles) > 0, Link(Rel("stylesheet"), Href(styles))),
-		},
-		Body: children,
-	})
-}
-
-type IconProps struct {
-	Class      string
-	Icon       string
-	FixedWidth bool
-	Size       string
-}
-
-var iconSizeMap = map[string]float64{
-	"xs":  0.75,
-	"sm":  0.875,
-	"md":  1,
-	"lg":  1.25,
-	"xl":  1.5,
-	"2xl": 2,
-}
-
-func icon(props IconProps) Node {
-	size, exists := iconSizeMap[props.Size]
-	if !exists {
-		size = iconSizeMap["md"]
-	}
-
-	heightStyle := "height: " + strconv.FormatFloat(size, 'f', 2, 64) + "em;"
-	widthStyle := "width: " + strconv.FormatFloat(size*1.25, 'f', 2, 64) + "em;"
-
-	return SVG(
-		Class("icon "+props.Class),
-		Aria("hidden", "true"),
-		Style(heightStyle+" "+widthStyle),
-		Rawf(`<use href="/static/img/icons.svg#%s" />`, props.Icon),
-	)
-}
-
-type ButtonProps struct {
-	Class   string
-	OnClick string
-}
-
-func button(props ButtonProps, children ...Node) Node {
-	return Button(
-		Class("btn "+props.Class),
-		If(len(props.OnClick) > 0, ds.On("click", props.OnClick)),
-		Group(children),
 	)
 }
