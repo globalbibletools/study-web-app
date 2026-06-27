@@ -323,11 +323,22 @@ func pageContent(data ChapterData) Node {
 						Span(
 							Class("verse-number"),
 							Text(verseNumberStr),
-							Text(" "),
 						),
+						Text(" "),
 						Map(verse.words, func(word WordData) Node {
 							return Group([]Node{
-								Span(Text(word.text)),
+								Button(
+									Class("gloss-popover-anchor"),
+									PopoverTarget("gloss-"+word.id),
+									TabIndex("-1"),
+									Text(word.text),
+								),
+								Span(
+									ID("gloss-"+word.id),
+									Class("gloss-popover"),
+									Popover("hint"),
+									Text("gloss"),
+								),
 								If(!strings.HasSuffix(word.text, "־"), Text(" ")),
 							})
 						}),

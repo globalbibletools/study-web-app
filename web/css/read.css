@@ -33,4 +33,22 @@
             min-width: 0;
         }
     }
+
+    .gloss-popover {
+        &:focus {
+            outline: none;
+        }
+    }
+
+    .gloss-popover {
+        position: absolute;
+        position-area: top center;
+        display: block;
+        border-radius: var(--radius-sm);
+        background: var(--color-tertiary);
+        font-weight: bold;
+        padding: var(--space-1);
+        line-height: var(--line-tight);
+        border: 1px solid var(--color-border);
+    }
 }
