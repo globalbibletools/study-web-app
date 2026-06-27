@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,12 @@ var books = []string{
 	"Leviticus",
 }
 
+var booksCodes = []string{
+	"Gen",
+	"Exo",
+	"Lev",
+}
+
 func parseReference(reference string) Reference {
 	chapterStartIndex := strings.IndexAny(reference, "0123456789")
 	if chapterStartIndex < 0 {
@@ -45,7 +52,7 @@ func parseReference(reference string) Reference {
 		}
 	}
 
-	matches := fuzzy.RankFindNormalizedFold(reference[0:chapterStartIndex], books)
+	matches := fuzzy.RankFindNormalizedFold(strings.TrimSpace(reference[0:chapterStartIndex]), books)
 	sort.Sort(matches)
 
 	if len(matches) == 0 {
@@ -70,8 +77,49 @@ func parseReference(reference string) Reference {
 	}
 }
 
+func parseReferenceCode(reference string) Reference {
+	splitIndex := strings.IndexRune(reference, '.')
+	if splitIndex < 0 {
+		book := uint(1 + slices.Index(booksCodes, reference))
+		if book <= 0 {
+			book = 1
+		}
+
+		return Reference{
+			book:    book,
+			chapter: 1,
+		}
+	}
+
+	book := uint(1 + slices.Index(booksCodes, reference[0:splitIndex]))
+
+	if book <= 0 {
+		return Reference{
+			book:    1,
+			chapter: 1,
+		}
+	}
+
+	chapter, err := strconv.ParseUint(reference[splitIndex+1:], 10, 32)
+	if err != nil {
+		return Reference{
+			book:    book,
+			chapter: 1,
+		}
+	}
+
+	return Reference{
+		book:    uint(book),
+		chapter: uint(chapter),
+	}
+}
+
+func formatReferenceCode(reference Reference) string {
+	return booksCodes[reference.book-1] + "." + strconv.FormatUint(uint64(reference.chapter), 10)
+}
+
 func formatReference(reference Reference) string {
-	return books[reference.book - 1] + strconv.FormatUint(uint64(reference.chapter), 10)
+	return books[reference.book-1] + " " + strconv.FormatUint(uint64(reference.chapter), 10)
 }
 
 func main() {
@@ -83,6 +131,60 @@ func main() {
 
 	fileServer := http.FileServer(http.Dir("./web"))
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer))
+
+	http.HandleFunc("/next", func(w http.ResponseWriter, r *http.Request) {
+		var signals Signals
+		if err := datastar.ReadSignals(r, &signals); err != nil {
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+		}
+
+		reference := parseReferenceCode(signals.Reference)
+		reference.chapter += 1
+
+		chapterData, err := getChapterData(r.Context(), reference)
+		if err != nil {
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+		}
+
+		sse := datastar.NewSSE(w, r)
+
+		sse.PatchElementGostar(
+			pageContent(chapterData),
+			datastar.WithMode(datastar.ElementPatchModeReplace),
+		)
+		sse.PatchElementGostar(
+			toolbar(chapterData),
+		)
+
+		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
+	})
+
+	http.HandleFunc("/prev", func(w http.ResponseWriter, r *http.Request) {
+		var signals Signals
+		if err := datastar.ReadSignals(r, &signals); err != nil {
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+		}
+
+		reference := parseReferenceCode(signals.Reference)
+		reference.chapter -= 1
+
+		chapterData, err := getChapterData(r.Context(), reference)
+		if err != nil {
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+		}
+
+		sse := datastar.NewSSE(w, r)
+
+		sse.PatchElementGostar(
+			pageContent(chapterData),
+			datastar.WithMode(datastar.ElementPatchModeReplace),
+		)
+		sse.PatchElementGostar(
+			toolbar(chapterData),
+		)
+
+		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
+	})
 
 	http.HandleFunc("/reference/{reference}", func(w http.ResponseWriter, r *http.Request) {
 		reference := parseReference(r.PathValue("reference"))
@@ -102,12 +204,11 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		referenceStr := formatReference(reference)
-		sse.MarshalAndPatchSignals(Signals{Reference: referenceStr})
+		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		reference := parseReference(r.URL.Query().Get("reference"))
+		reference := parseReferenceCode(r.URL.Query().Get("reference"))
 
 		chapterData, err := getChapterData(r.Context(), reference)
 		if err != nil {
@@ -241,17 +342,15 @@ func chapterInput(data ChapterData) Node {
 	return Div(
 		ID("chapter-input"),
 		Class("chapter-input"),
-		ui.TextInput(ui.TextInputProps{},
-			ds.Bind("reference"),
+		ui.TextInput(
+			ui.TextInputProps{},
+			Value(formatReference(data.Reference)),
 		),
 		Div(
 			Class("chapter-input-actions"),
 			ui.Btn(
 				ui.ButtonProps{
-					OnClick: fmt.Sprintf(
-						"@get('/reference/%s')",
-						formatReference(Reference{book: data.Reference.book, chapter: data.Reference.chapter - 1}),
-					),
+					OnClick: "@get('/prev')",
 				},
 				ui.Icon(ui.IconProps{
 					Icon: "arrow-up",
@@ -259,10 +358,7 @@ func chapterInput(data ChapterData) Node {
 			),
 			ui.Btn(
 				ui.ButtonProps{
-					OnClick: fmt.Sprintf(
-						"@get('/reference/%s')",
-						formatReference(Reference{book: data.Reference.book, chapter: data.Reference.chapter + 1}),
-					),
+					OnClick: "@get('/next')",
 				},
 				ui.Icon(ui.IconProps{
 					Icon: "arrow-down",
@@ -283,7 +379,7 @@ func read(data ChapterData) Node {
 	return ui.Layout(
 		"/static/css/read.css",
 		ds.Signals(map[string]any{
-			"reference": formatReference(data.Reference),
+			"reference": formatReferenceCode(data.Reference),
 		}),
 		ds.Effect(`
 			const url = new URL(window.location);
