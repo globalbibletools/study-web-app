@@ -14,6 +14,7 @@ type ButtonProps struct {
 func Btn(props ButtonProps, children ...Node) Node {
 	return Button(
 		Class("btn "+props.Class),
+		Type("button"),
 		If(len(props.OnClick) > 0, ds.On("click", props.OnClick)),
 		Group(children),
 	)

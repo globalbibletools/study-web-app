@@ -186,8 +186,8 @@ func main() {
 		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
 	})
 
-	http.HandleFunc("/reference/{reference}", func(w http.ResponseWriter, r *http.Request) {
-		reference := parseReference(r.PathValue("reference"))
+	http.HandleFunc("/reference", func(w http.ResponseWriter, r *http.Request) {
+		reference := parseReference(strings.ReplaceAll(r.URL.Query().Get("reference"), "+", " "))
 
 		chapterData, err := getChapterData(r.Context(), reference)
 		if err != nil {
@@ -344,6 +344,7 @@ func chapterInput(data ChapterData) Node {
 		Class("chapter-input"),
 		ui.TextInput(
 			ui.TextInputProps{},
+			Name("reference"),
 			Value(formatReference(data.Reference)),
 		),
 		Div(
@@ -371,7 +372,10 @@ func chapterInput(data ChapterData) Node {
 func toolbar(data ChapterData) Node {
 	return Div(
 		ID("toolbar"),
-		chapterInput(data),
+		Form(
+			ds.On("submit", "@get('/reference', {contentType: 'form'})"),
+			chapterInput(data),
+		),
 	)
 }
 
