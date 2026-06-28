@@ -131,6 +131,7 @@ func main() {
 
 	fileServer := http.FileServer(http.Dir("./web"))
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer))
+	http.Handle("/favicon.ico", fileServer)
 
 	http.HandleFunc("/next", func(w http.ResponseWriter, r *http.Request) {
 		var signals Signals
