@@ -1,9 +1,83 @@
 @layer system {
     :root {
+        --blue-50: #d7ffff;
+        --blue-100: #6df9ff;
+        --blue-200: #4bdde5;
+        --blue-300: #1cc2ca;
+        --blue-400: #00a7b0;
+        --blue-500: #008d95;
+        --blue-600: #007279;
+        --blue-700: #00575d;
+        --blue-800: #003e42;
+        --blue-900: #002629;
+        --blue-950: #001013;
+
+        --green-50: #daffff;
+        --green-100: #9fe2d9;
+        --green-200: #86c8c0;
+        --green-300: #6dafa7;
+        --green-400: #54968e;
+        --green-500: #3b7e77;
+        --green-600: #216760;
+        --green-700: #00504a;
+        --green-800: #003b35;
+        --green-900: #002521;
+        --green-950: #00110e;
+
+        --brown-50: #fffddf;
+        --brown-100: #f2edcf;
+        --brown-200: #d5d0b3;
+        --brown-300: #b9b497;
+        --brown-400: #9d997d;
+        --brown-500: #837e63;
+        --brown-600: #69654a;
+        --brown-700: #514c32;
+        --brown-800: #39351c;
+        --brown-900: #231f06;
+        --brown-950: #0f0b00;
+
+        @media (prefers-color-scheme: dark) {
+            --blue-50: #001114;
+            --blue-100: #002529;
+            --blue-200: #003d41;
+            --blue-300: #00555b;
+            --blue-400: #007076;
+            --blue-500: #008b93;
+            --blue-600: #00a6af;
+            --blue-700: #05c1ca;
+            --blue-800: #41dde5;
+            --blue-900: #64f9ff;
+            --blue-950: #deffff;
+
+            --green-50: #00120f;
+            --green-100: #002622;
+            --green-200: #003d37;
+            --green-300: #08544e;
+            --green-400: #296c65;
+            --green-500: #43857d;
+            --green-600: #5c9e97;
+            --green-700: #76b9b1;
+            --green-800: #90d4cb;
+            --green-900: #abf0e7;
+            --green-950: #e0ffff;
+
+            --brown-50: #100c00;
+            --brown-100: #221e06;
+            --brown-200: #37331b;
+            --brown-300: #4d4930;
+            --brown-400: #646046;
+            --brown-500: #6c684d;
+            --brown-600: #969175;
+            --brown-700: #b0ab8e;
+            --brown-800: #cac6a8;
+            --brown-900: #e6e1c3;
+            --brown-950: #fffdde;
+        }
+
       /* Brand */
-      --color-primary: #066f74;
-      --color-secondary: #83c5be;
-      --color-tertiary: #f8f7ee;
+      --color-primary: light-dark(var(--blue-600), var(--blue-400));
+      --color-secondary: light-dark(var(--green-100), var(--green-900));
+      --color-tertiary: light-dark(var(--brown-100), var(--brown-900));
 
       /* Neutrals */
       --color-bg: #ffffff;

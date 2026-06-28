@@ -34,7 +34,9 @@
         }
     }
 
-    .gloss-popover {
+    .gloss-popover-anchor {
+        display: inline;
+
         &:focus {
             outline: none;
         }
@@ -43,12 +45,13 @@
     .gloss-popover {
         position: absolute;
         position-area: top center;
-        display: block;
+        margin-bottom: calc(-1 * var(--space-1));
         border-radius: var(--radius-sm);
-        background: var(--color-tertiary);
+        background: color-mix(in srgb, var(--color-tertiary) 90%, black);
         font-weight: bold;
-        padding: var(--space-1);
-        line-height: var(--line-tight);
+        padding: 0 var(--space-1);
+        line-height: var(--line-normal);
         border: 1px solid var(--color-border);
+        width: max-content;
     }
 }

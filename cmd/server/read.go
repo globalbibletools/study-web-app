@@ -222,8 +222,9 @@ func main() {
 }
 
 type WordData struct {
-	id   string
-	text string
+	id    string
+	text  string
+	gloss string
 }
 
 type VerseData struct {
@@ -245,14 +246,18 @@ func getChapterData(context context.Context, reference Reference) (ChapterData, 
 	defer dbpool.Put(conn)
 
 	stmt := conn.Prep(`
-		select verse.number as verse, word.id, word.text from verse
+		select verse.number as verse, word.id, word.text, phrase.gloss from verse
 		join word on word.verse_id = verse.id
+		join phrase_word on word.id = phrase_word.word_id
+		join phrase on phrase.id = phrase_word.phrase_id
 		where book_id = $bookId
 		and chapter = $chapter
+		and phrase.language_id = (select id from language where code = $langCode)
 		order by verse.id, word.id
 	`)
 	stmt.SetInt64("$bookId", int64(reference.book))
 	stmt.SetInt64("$chapter", int64(reference.chapter))
+	stmt.SetText("$langCode", "eng")
 
 	var verses []VerseData
 	var verseNumber uint = 0
@@ -277,8 +282,9 @@ func getChapterData(context context.Context, reference Reference) (ChapterData, 
 		}
 
 		words = append(words, WordData{
-			id:   stmt.GetText("id"),
-			text: stmt.GetText("text"),
+			id:    stmt.GetText("id"),
+			text:  stmt.GetText("text"),
+			gloss: stmt.GetText("gloss"),
 		})
 	}
 
@@ -330,14 +336,15 @@ func pageContent(data ChapterData) Node {
 								Button(
 									Class("gloss-popover-anchor"),
 									PopoverTarget("gloss-"+word.id),
+									PopoverTargetAction("show"),
 									TabIndex("-1"),
 									Text(word.text),
 								),
 								Span(
 									ID("gloss-"+word.id),
 									Class("gloss-popover"),
-									Popover("hint"),
-									Text("gloss"),
+									Popover(),
+									Text(word.gloss),
 								),
 								If(!strings.HasSuffix(word.text, "־"), Text(" ")),
 							})
