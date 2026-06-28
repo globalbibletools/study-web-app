@@ -14,7 +14,7 @@ func Layout(
 		Title:    "Global Bible Tools",
 		Language: "en",
 		Head: []Node{
-			Script(Type("module"), Src("/static/scripts/datastar.js")),
+			Script(Type("module"), Defer(), Src("/static/scripts/datastar.js")),
 			Link(Rel("stylesheet"), Href("/static/css/reset.css")),
 			Link(Rel("stylesheet"), Href("/static/css/system.css")),
 			Link(Rel("stylesheet"), Href("/static/css/components.css")),
