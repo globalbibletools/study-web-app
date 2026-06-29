@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"crawshaw.io/sqlite"
 	"crawshaw.io/sqlite/sqlitex"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/starfederation/datastar-go/datastar"
@@ -123,11 +124,31 @@ func formatReference(reference Reference) string {
 }
 
 func main() {
-	var err error
-	dbpool, err = sqlitex.Open("file:export.db", 0, 10)
+	con, err := sqlite.OpenConn("file:export.db", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	dbpool, err = sqlitex.Open("file::memory:?cache=shared", 0, 10)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	targetCon := dbpool.Get(context.Background())
+	backup, err := con.BackupInit("", "", targetCon)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := backup.Step(-1); err != nil {
+		log.Fatal(err)
+	}
+	if err := backup.Finish(); err != nil {
+		log.Fatal(err)
+	}
+	dbpool.Put(targetCon)
+	_ = con.Close()
+
+	log.Println("database loaded")
 
 	fileServer := http.FileServer(http.Dir("./web"))
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer))
