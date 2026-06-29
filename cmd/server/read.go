@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
-	"crawshaw.io/sqlite"
-	"crawshaw.io/sqlite/sqlitex"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/starfederation/datastar-go/datastar"
 	. "maragu.dev/gomponents"
@@ -25,7 +25,7 @@ type Signals struct {
 	Reference string `json:"reference"`
 }
 
-var dbpool *sqlitex.Pool
+var dbpool *pgxpool.Pool
 
 type Reference struct {
 	book    uint
@@ -124,31 +124,12 @@ func formatReference(reference Reference) string {
 }
 
 func main() {
-	con, err := sqlite.OpenConn("file:export.db", 0)
+	var err error
+
+	dbpool, err = pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	dbpool, err = sqlitex.Open("file::memory:?cache=shared", 0, 10)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	targetCon := dbpool.Get(context.Background())
-	backup, err := con.BackupInit("", "", targetCon)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := backup.Step(-1); err != nil {
-		log.Fatal(err)
-	}
-	if err := backup.Finish(); err != nil {
-		log.Fatal(err)
-	}
-	dbpool.Put(targetCon)
-	_ = con.Close()
-
-	log.Println("database loaded")
 
 	fileServer := http.FileServer(http.Dir("./web"))
 	http.Handle("/static/", http.StripPrefix("/static/", fileServer))
@@ -234,7 +215,9 @@ func main() {
 
 		chapterData, err := getChapterData(r.Context(), reference)
 		if err != nil {
+			log.Printf("Error: %s\n", err)
 			http.Error(w, "Server Error", http.StatusInternalServerError)
+			return
 		}
 
 		_ = read(chapterData).Render(w)
@@ -261,38 +244,34 @@ type ChapterData struct {
 }
 
 func getChapterData(context context.Context, reference Reference) (ChapterData, error) {
-	conn := dbpool.Get(context)
-	if conn == nil {
-		return ChapterData{}, fmt.Errorf("failed to get database connection")
-	}
-	defer dbpool.Put(conn)
-
-	stmt := conn.Prep(`
-		select verse.number as verse, word.id, word.text, phrase.gloss from verse
+	rows, _ := dbpool.Query(context, `
+		select
+			verse.number as verse,
+			word.id,
+			word.text,
+			gloss.gloss
+		from verse
 		join word on word.verse_id = verse.id
 		join phrase_word on word.id = phrase_word.word_id
 		join phrase on phrase.id = phrase_word.phrase_id
-		where book_id = $bookId
-		and chapter = $chapter
-		and phrase.language_id = (select id from language where code = $langCode)
+		join gloss on gloss.phrase_id = phrase.id
+		where verse.book_id = $1
+			and verse.chapter = $2
+			and phrase.language_id = (select id from language where code = $3)
+			and phrase.deleted_at is null
+			and gloss.state = 'APPROVED'
 		order by verse.id, word.id
-	`)
-	stmt.SetInt64("$bookId", int64(reference.book))
-	stmt.SetInt64("$chapter", int64(reference.chapter))
-	stmt.SetText("$langCode", "eng")
+	`, reference.book, reference.chapter, "eng",
+	)
 
 	var verses []VerseData
 	var verseNumber uint = 0
 	var words []WordData
-	for {
-		if hasRow, err := stmt.Step(); err != nil {
-			return ChapterData{}, err
-		} else if !hasRow {
-			break
-		}
 
-		newVerseNumber := uint(stmt.GetInt64("verse"))
-		if newVerseNumber != verseNumber {
+	var word WordData
+	var nextVerseNumber uint
+	_, err := pgx.ForEachRow(rows, []any{&nextVerseNumber, &word.id, &word.text, &word.gloss}, func() error {
+		if nextVerseNumber != verseNumber {
 			if verseNumber > 0 {
 				verses = append(verses, VerseData{
 					verseNumber,
@@ -300,14 +279,15 @@ func getChapterData(context context.Context, reference Reference) (ChapterData, 
 				})
 				words = []WordData{}
 			}
-			verseNumber = newVerseNumber
+			verseNumber = nextVerseNumber
 		}
 
-		words = append(words, WordData{
-			id:    stmt.GetText("id"),
-			text:  stmt.GetText("text"),
-			gloss: stmt.GetText("gloss"),
-		})
+		words = append(words, word)
+
+		return nil
+	})
+	if err != nil {
+		return ChapterData{}, err
 	}
 
 	if len(words) > 0 {
@@ -317,22 +297,23 @@ func getChapterData(context context.Context, reference Reference) (ChapterData, 
 		})
 	}
 
-	stmt = conn.Prep(`
-		select name from book
-		where id = $bookId
-	`)
-	stmt.SetInt64("$bookId", 1)
-
-	if hasRow, err := stmt.Step(); err != nil {
-		return ChapterData{}, err
-	} else if !hasRow {
-		return ChapterData{}, nil
+	type BookRow struct {
+		Name string
 	}
-	stmt.Step()
+
+	rows, _ = dbpool.Query(context, `
+		select name from book
+		where id = $1
+	`, reference.book,
+	)
+	book, err := pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[BookRow])
+	if err != nil {
+		return ChapterData{}, err
+	}
 
 	return ChapterData{
 		Reference: reference,
-		BookName:  stmt.GetText("name"),
+		BookName:  book.Name,
 		Verses:    verses,
 	}, nil
 }
