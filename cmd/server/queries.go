@@ -30,7 +30,7 @@ func GetChapterData(context context.Context, reference Reference, langCode strin
 			verse.number as verse,
 			word.id,
 			word.text,
-			coalesce(gloss.gloss, '') as gloss,
+			coalesce(gloss.gloss, '') as gloss
 		from verse
 		join word on word.verse_id = verse.id
 		left join lateral (
