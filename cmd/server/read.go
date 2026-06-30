@@ -5,14 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/starfederation/datastar-go/datastar"
 	. "maragu.dev/gomponents"
 	ds "maragu.dev/gomponents-datastar"
@@ -28,11 +25,6 @@ type Signals struct {
 
 var dbpool *pgxpool.Pool
 
-type Reference struct {
-	book    uint
-	chapter uint
-}
-
 var books = []string{
 	"Genesis",
 	"Exodus",
@@ -43,85 +35,6 @@ var booksCodes = []string{
 	"Gen",
 	"Exo",
 	"Lev",
-}
-
-func parseReference(reference string) Reference {
-	chapterStartIndex := strings.IndexAny(reference, "0123456789")
-	if chapterStartIndex < 0 {
-		return Reference{
-			book:    1,
-			chapter: 1,
-		}
-	}
-
-	matches := fuzzy.RankFindNormalizedFold(strings.TrimSpace(reference[0:chapterStartIndex]), books)
-	sort.Sort(matches)
-
-	if len(matches) == 0 {
-		return Reference{
-			book:    1,
-			chapter: 1,
-		}
-	}
-
-	book := matches[0].OriginalIndex + 1
-	chapter, err := strconv.ParseUint(reference[chapterStartIndex:], 10, 32)
-	if err != nil {
-		return Reference{
-			book:    1,
-			chapter: 1,
-		}
-	}
-
-	return Reference{
-		book:    uint(book),
-		chapter: uint(chapter),
-	}
-}
-
-func parseReferenceCode(reference string) Reference {
-	splitIndex := strings.IndexRune(reference, '.')
-	if splitIndex < 0 {
-		book := uint(1 + slices.Index(booksCodes, reference))
-		if book <= 0 {
-			book = 1
-		}
-
-		return Reference{
-			book:    book,
-			chapter: 1,
-		}
-	}
-
-	book := uint(1 + slices.Index(booksCodes, reference[0:splitIndex]))
-
-	if book <= 0 {
-		return Reference{
-			book:    1,
-			chapter: 1,
-		}
-	}
-
-	chapter, err := strconv.ParseUint(reference[splitIndex+1:], 10, 32)
-	if err != nil {
-		return Reference{
-			book:    book,
-			chapter: 1,
-		}
-	}
-
-	return Reference{
-		book:    uint(book),
-		chapter: uint(chapter),
-	}
-}
-
-func formatReferenceCode(reference Reference) string {
-	return booksCodes[reference.book-1] + "." + strconv.FormatUint(uint64(reference.chapter), 10)
-}
-
-func formatReference(reference Reference) string {
-	return books[reference.book-1] + " " + strconv.FormatUint(uint64(reference.chapter), 10)
 }
 
 func main() {
@@ -142,7 +55,7 @@ func main() {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
-		reference := parseReferenceCode(signals.Reference)
+		reference := ParseReferenceCode(signals.Reference)
 		reference.chapter += 1
 
 		chapterData, err := getChapterData(r.Context(), reference, signals.LangCode)
@@ -160,7 +73,7 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference), LangCode: signals.LangCode})
+		sse.MarshalAndPatchSignals(Signals{Reference: reference.FormatAsCode(), LangCode: signals.LangCode})
 	})
 
 	http.HandleFunc("/prev", func(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +82,7 @@ func main() {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
-		reference := parseReferenceCode(signals.Reference)
+		reference := ParseReferenceCode(signals.Reference)
 		reference.chapter -= 1
 
 		chapterData, err := getChapterData(r.Context(), reference, signals.LangCode)
@@ -187,7 +100,7 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference), LangCode: signals.LangCode})
+		sse.MarshalAndPatchSignals(Signals{Reference: reference.FormatAsCode(), LangCode: signals.LangCode})
 	})
 
 	http.HandleFunc("/reference", func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +109,7 @@ func main() {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
-		reference := parseReference(strings.ReplaceAll(r.URL.Query().Get("reference"), "+", " "))
+		reference := ParseReference(strings.ReplaceAll(r.URL.Query().Get("reference"), "+", " "))
 
 		chapterData, err := getChapterData(r.Context(), reference, signals.LangCode)
 		if err != nil {
@@ -213,11 +126,11 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference), LangCode: signals.LangCode})
+		sse.MarshalAndPatchSignals(Signals{Reference: reference.FormatAsCode(), LangCode: signals.LangCode})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		reference := parseReferenceCode(r.URL.Query().Get("reference"))
+		reference := ParseReferenceCode(r.URL.Query().Get("reference"))
 		langCode := r.URL.Query().Get("lang")
 		if langCode == "" {
 			langCode = "eng"
@@ -378,7 +291,7 @@ func chapterInput(data ChapterData) Node {
 		ui.TextInput(
 			ui.TextInputProps{},
 			Name("reference"),
-			Value(formatReference(data.Reference)),
+			Value(data.Reference.Format()),
 		),
 		Div(
 			Class("chapter-input-actions"),
@@ -416,7 +329,7 @@ func read(data ChapterData) Node {
 	return ui.Layout(
 		"/static/css/read.css",
 		ds.Signals(map[string]any{
-			"reference": formatReferenceCode(data.Reference),
+			"reference": data.Reference.FormatAsCode(),
 			"lang":      data.LangCode,
 		}),
 		ds.Effect(`
