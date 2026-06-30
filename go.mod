@@ -3,6 +3,7 @@ module gbtreader
 go 1.26.3
 
 require (
+	github.com/CAFxX/httpcompression v0.0.9
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/starfederation/datastar-go v1.2.2
@@ -12,7 +13,6 @@ require (
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
-	github.com/CAFxX/httpcompression v0.0.9 // indirect
 	github.com/air-verse/air v1.65.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/bep/godartsass/v2 v2.5.0 // indirect

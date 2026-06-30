@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CAFxX/httpcompression"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/starfederation/datastar-go/datastar"
 )
@@ -22,6 +23,13 @@ func main() {
 	var err error
 
 	dbpool, err = pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	compress, err := httpcompression.DefaultAdapter(
+		httpcompression.ContentTypes([]string{"text/html"}, false),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,7 +52,7 @@ func main() {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
-		sse := datastar.NewSSE(w, r)
+		sse := datastar.NewSSE(w, r, datastar.WithCompression())
 
 		sse.PatchElementGostar(
 			PageContent(chapterData),
@@ -71,7 +79,7 @@ func main() {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
-		sse := datastar.NewSSE(w, r)
+		sse := datastar.NewSSE(w, r, datastar.WithCompression())
 
 		sse.PatchElementGostar(
 			PageContent(chapterData),
@@ -96,7 +104,7 @@ func main() {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
 
-		sse := datastar.NewSSE(w, r)
+		sse := datastar.NewSSE(w, r, datastar.WithCompression())
 
 		sse.PatchElementGostar(
 			PageContent(chapterData),
@@ -126,5 +134,5 @@ func main() {
 		_ = ReadPage(chapterData).Render(w)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", compress(http.DefaultServeMux)))
 }
