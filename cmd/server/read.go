@@ -23,6 +23,7 @@ import (
 
 type Signals struct {
 	Reference string `json:"reference"`
+	LangCode  string `json:"lang"`
 }
 
 var dbpool *pgxpool.Pool
@@ -144,7 +145,7 @@ func main() {
 		reference := parseReferenceCode(signals.Reference)
 		reference.chapter += 1
 
-		chapterData, err := getChapterData(r.Context(), reference)
+		chapterData, err := getChapterData(r.Context(), reference, signals.LangCode)
 		if err != nil {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
@@ -159,7 +160,7 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
+		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference), LangCode: signals.LangCode})
 	})
 
 	http.HandleFunc("/prev", func(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +172,7 @@ func main() {
 		reference := parseReferenceCode(signals.Reference)
 		reference.chapter -= 1
 
-		chapterData, err := getChapterData(r.Context(), reference)
+		chapterData, err := getChapterData(r.Context(), reference, signals.LangCode)
 		if err != nil {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
@@ -186,13 +187,18 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
+		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference), LangCode: signals.LangCode})
 	})
 
 	http.HandleFunc("/reference", func(w http.ResponseWriter, r *http.Request) {
+		var signals Signals
+		if err := datastar.ReadSignals(r, &signals); err != nil {
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+		}
+
 		reference := parseReference(strings.ReplaceAll(r.URL.Query().Get("reference"), "+", " "))
 
-		chapterData, err := getChapterData(r.Context(), reference)
+		chapterData, err := getChapterData(r.Context(), reference, signals.LangCode)
 		if err != nil {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
@@ -207,13 +213,17 @@ func main() {
 			toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference)})
+		sse.MarshalAndPatchSignals(Signals{Reference: formatReferenceCode(reference), LangCode: signals.LangCode})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		reference := parseReferenceCode(r.URL.Query().Get("reference"))
+		langCode := r.URL.Query().Get("lang")
+		if langCode == "" {
+			langCode = "eng"
+		}
 
-		chapterData, err := getChapterData(r.Context(), reference)
+		chapterData, err := getChapterData(r.Context(), reference, langCode)
 		if err != nil {
 			log.Printf("Error: %s\n", err)
 			http.Error(w, "Server Error", http.StatusInternalServerError)
@@ -239,11 +249,12 @@ type VerseData struct {
 
 type ChapterData struct {
 	Reference Reference
+	LangCode  string
 	BookName  string
 	Verses    []VerseData
 }
 
-func getChapterData(context context.Context, reference Reference) (ChapterData, error) {
+func getChapterData(context context.Context, reference Reference, langCode string) (ChapterData, error) {
 	rows, _ := dbpool.Query(context, `
 		select
 			verse.number as verse,
@@ -261,7 +272,7 @@ func getChapterData(context context.Context, reference Reference) (ChapterData, 
 			and phrase.deleted_at is null
 			and gloss.state = 'APPROVED'
 		order by verse.id, word.id
-	`, reference.book, reference.chapter, "eng",
+	`, reference.book, reference.chapter, langCode,
 	)
 
 	var verses []VerseData
@@ -313,6 +324,7 @@ func getChapterData(context context.Context, reference Reference) (ChapterData, 
 
 	return ChapterData{
 		Reference: reference,
+		LangCode:  langCode,
 		BookName:  book.Name,
 		Verses:    verses,
 	}, nil
@@ -405,10 +417,12 @@ func read(data ChapterData) Node {
 		"/static/css/read.css",
 		ds.Signals(map[string]any{
 			"reference": formatReferenceCode(data.Reference),
+			"lang":      data.LangCode,
 		}),
 		ds.Effect(`
 			const url = new URL(window.location);
 			$reference ? url.searchParams.set('reference', $reference) : url.searchParams.delete('reference');
+			$lang ? url.searchParams.set('lang', $lang) : url.searchParams.delete('lang');
 			window.history.replaceState({}, '', url);
 		`),
 		toolbar(data),
