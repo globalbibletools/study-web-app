@@ -33,14 +33,17 @@ func GetChapterData(context context.Context, reference Reference, langCode strin
 			gloss.gloss
 		from verse
 		join word on word.verse_id = verse.id
-		join phrase_word on word.id = phrase_word.word_id
-		join phrase on phrase.id = phrase_word.phrase_id
-		join gloss on gloss.phrase_id = phrase.id
+		left join lateral (
+			select gloss.gloss from phrase_word 
+			left join phrase on phrase.id = phrase_word.phrase_id
+			left join gloss on gloss.phrase_id = phrase.id
+			where word.id = phrase_word.word_id
+				and phrase.language_id = (select id from language where code = $3)
+				and phrase.deleted_at is null
+				and gloss.state = 'APPROVED'
+		) as gloss on true
 		where verse.book_id = $1
 			and verse.chapter = $2
-			and phrase.language_id = (select id from language where code = $3)
-			and phrase.deleted_at is null
-			and gloss.state = 'APPROVED'
 		order by verse.id, word.id
 	`, reference.book, reference.chapter, langCode,
 	)
