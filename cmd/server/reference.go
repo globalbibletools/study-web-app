@@ -14,6 +14,18 @@ type Reference struct {
 	chapter uint
 }
 
+var books = []string{
+	"Genesis",
+	"Exodus",
+	"Leviticus",
+}
+
+var booksCodes = []string{
+	"Gen",
+	"Exo",
+	"Lev",
+}
+
 func ParseReference(reference string) Reference {
 	chapterStartIndex := strings.IndexAny(reference, "0123456789")
 	if chapterStartIndex < 0 {
