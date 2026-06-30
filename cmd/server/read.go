@@ -85,14 +85,13 @@ func main() {
 	})
 
 	http.HandleFunc("/reference", func(w http.ResponseWriter, r *http.Request) {
-		var signals Signals
-		if err := datastar.ReadSignals(r, &signals); err != nil {
-			http.Error(w, "Server Error", http.StatusInternalServerError)
+		reference := ParseReference(strings.ReplaceAll(r.URL.Query().Get("reference"), "+", " "))
+		langCode := r.URL.Query().Get("lang")
+		if langCode == "" {
+			langCode = "eng"
 		}
 
-		reference := ParseReference(strings.ReplaceAll(r.URL.Query().Get("reference"), "+", " "))
-
-		chapterData, err := GetChapterData(r.Context(), reference, signals.LangCode)
+		chapterData, err := GetChapterData(r.Context(), reference, langCode)
 		if err != nil {
 			http.Error(w, "Server Error", http.StatusInternalServerError)
 		}
@@ -107,7 +106,7 @@ func main() {
 			Toolbar(chapterData),
 		)
 
-		sse.MarshalAndPatchSignals(Signals{Reference: reference.FormatAsCode(), LangCode: signals.LangCode})
+		sse.MarshalAndPatchSignals(Signals{Reference: reference.FormatAsCode(), LangCode: langCode})
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

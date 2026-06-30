@@ -83,12 +83,28 @@ func ChapterInput(data ChapterData) Node {
 	)
 }
 
+func LanguageInput(data ChapterData) Node {
+	return ui.ComboboxInput(
+		ui.ComboboxInputProps{
+			Value: data.LangCode,
+			Options: []ui.ComboboxInputOption{
+				{Value: "eng", Name: "English"},
+				{Value: "spa", Name: "Spanish"},
+				{Value: "hin", Name: "Hindi"},
+			},
+		},
+		Name("lang"),
+		ds.On("change", "@get('/reference', {contentType: 'form'})"),
+	)
+}
+
 func Toolbar(data ChapterData) Node {
 	return Div(
 		ID("toolbar"),
 		Form(
 			ds.On("submit", "@get('/reference', {contentType: 'form'})"),
 			ChapterInput(data),
+			LanguageInput(data),
 		),
 	)
 }
